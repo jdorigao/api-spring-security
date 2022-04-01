@@ -3,18 +3,28 @@ package br.com.jdorigao.apispringsecurity;
 import br.com.jdorigao.apispringsecurity.entity.*;
 import br.com.jdorigao.apispringsecurity.util.Util;
 import org.apache.http.HttpException;
+import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 public class Teste {
 
@@ -25,47 +35,42 @@ public class Teste {
     public static void main(String[] args) {
 
         try {
-            //enviaVenda();
-            buscarVendas();
+            enviaVenda();
+            buscaVendas();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     private static void enviaVenda() throws Exception {
-        CloseableHttpClient httpClient = HttpClients.createDefault();
-
         HttpPost post = new HttpPost(URL_VENDA);
-        post.setHeader("Content-type", "application/json");
-
         Venda venda = criaVenda();
         String jsonEnvio = Util.objectToJson(venda);
         post.setEntity(new StringEntity(jsonEnvio));
-
-        CloseableHttpResponse response = httpClient.execute(post);
-        int statusCode = response.getStatusLine().getStatusCode();
-        if (statusCode != 200 && statusCode != 201) {
-            throw new HttpException("Erro ao enviar requisição " + statusCode);
-        }
-
-        String jsonResposta = EntityUtils.toString(response.getEntity());
-        System.out.println(jsonResposta);
+        String jsonResposta = enviaRequest(post);
+        Venda vendaSalva = Util.jsonToObject(jsonResposta, Venda.class);
+        System.out.println(vendaSalva);
     }
 
-    private static void buscarVendas() throws Exception {
+    private static void buscaVendas() throws Exception {
+        HttpGet get = new HttpGet(URL_VENDA + "/99999999999999");
+        String resposta = enviaRequest(get);
+        List<Venda> vendas = Arrays.asList(Util.jsonToObject(resposta, Venda[].class));
+        vendas.forEach(System.out::println);
+    }
+
+    private static String enviaRequest(HttpRequestBase metodo) throws IOException, HttpException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
         CloseableHttpClient httpClient = HttpClients.createDefault();
+        metodo.setHeader("Content-type", "application/json");
 
-        HttpGet get = new HttpGet(URL_VENDA+"/99999999999999");
-        get.setHeader("Content-type", "application/json");
+        metodo.setHeader(HttpHeaders.AUTHORIZATION, Util.criaTokenCriptorgrafado(TOKEN));
+        CloseableHttpResponse response = httpClient.execute(metodo);
 
-        CloseableHttpResponse response = httpClient.execute(get);
         int statusCode = response.getStatusLine().getStatusCode();
         if (statusCode != 200 && statusCode != 201) {
-            throw new HttpException("Erro ao enviar requisição " + statusCode);
+            throw new HttpException("Erro ao enviar requisição: " + statusCode);
         }
-
-        String jsonResposta = EntityUtils.toString(response.getEntity());
-        System.out.println(jsonResposta);
+        return EntityUtils.toString(response.getEntity());
     }
 
     private static Venda criaVenda() {
